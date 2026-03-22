@@ -45,7 +45,7 @@ export default function RootLayout({
     >
       <head>
         <meta name="creator" content="Perplexity Computer" />
-        <link rel="icon" href="/novion-icon.jpg" />
+        <link rel="icon" href="/novion-icon.png" />
       </head>
       <body className="flex min-h-full flex-col antialiased">
         <Header />

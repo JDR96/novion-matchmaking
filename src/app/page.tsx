@@ -51,10 +51,10 @@ export default function Home() {
         <div className="relative mx-auto max-w-2xl text-center">
           <div className="mb-6 flex justify-center">
             <Image
-              src="/novion-logo.jpg"
+              src="/novion-logo.png"
               alt="Novion Capital"
-              width={220}
-              height={55}
+              width={260}
+              height={46}
               className="h-auto"
               priority
             />

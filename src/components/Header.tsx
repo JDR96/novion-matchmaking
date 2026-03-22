@@ -13,15 +13,12 @@ export default function Header() {
           data-testid="link-home"
         >
           <Image
-            src="/novion-icon.jpg"
+            src="/novion-logo.png"
             alt="Novion"
-            width={36}
-            height={36}
-            className="rounded"
+            width={140}
+            height={25}
+            className="h-7 w-auto"
           />
-          <span className="font-[family-name:var(--font-space-grotesk)] text-[17px] font-semibold tracking-tight text-foreground">
-            NOVION
-          </span>
         </Link>
         <nav className="flex items-center gap-0.5">
           <Link
