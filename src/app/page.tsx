@@ -43,19 +43,10 @@ const features = [
 export default function Home() {
   return (
     <div className="flex flex-col">
-      {/* Hero */}
-      <section className="relative overflow-hidden bg-navy px-4 py-24 sm:px-6 sm:py-32">
-        {/* Subtle pattern */}
-        <div
-          className="pointer-events-none absolute inset-0 opacity-[0.02]"
-          style={{
-            backgroundImage:
-              "radial-gradient(circle at 1px 1px, rgba(196,165,106,0.4) 1px, transparent 0)",
-            backgroundSize: "32px 32px",
-          }}
-        />
-        {/* Gold accent glow */}
-        <div className="pointer-events-none absolute left-1/2 top-0 h-80 w-[500px] -translate-x-1/2 rounded-full bg-gold/5 blur-3xl" />
+      {/* Hero — warm cream background */}
+      <section className="relative overflow-hidden bg-cream px-4 py-24 sm:px-6 sm:py-32">
+        {/* Subtle gold accent glow */}
+        <div className="pointer-events-none absolute left-1/2 top-0 h-64 w-[400px] -translate-x-1/2 rounded-full bg-gold/5 blur-3xl" />
 
         <div className="relative mx-auto max-w-2xl text-center">
           <div className="mb-6 flex justify-center">
@@ -68,11 +59,11 @@ export default function Home() {
               priority
             />
           </div>
-          <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold tracking-tight text-white sm:text-4xl">
+          <h1 className="font-[family-name:var(--font-space-grotesk)] text-3xl font-bold tracking-tight text-foreground sm:text-4xl">
             Contact{" "}
             <span className="text-gold-gradient">Intelligence</span>
           </h1>
-          <p className="mt-4 text-[15px] leading-relaxed text-white/50">
+          <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground">
             Beschrijf in het Nederlands wie u zoekt. Ons systeem doorzoekt
             17.500+ contacten via AI-gestuurde vector search en toont de meest
             relevante matches uit uw netwerk.
@@ -83,14 +74,14 @@ export default function Home() {
         </div>
       </section>
 
-      {/* Features */}
-      <section className="bg-cream px-4 py-16 sm:px-6 sm:py-20">
+      {/* Features — white background */}
+      <section className="border-t border-border bg-white px-4 py-16 sm:px-6 sm:py-20">
         <div className="mx-auto w-full max-w-5xl">
           <div className="grid gap-6 sm:grid-cols-3">
             {features.map((feature, i) => (
               <div
                 key={i}
-                className="rounded-2xl border border-border bg-white p-6 shadow-[0_4px_20px_hsla(213,71%,13%,0.06)] transition-shadow hover:shadow-[0_8px_30px_hsla(213,71%,13%,0.1)]"
+                className="rounded-2xl border border-border bg-cream/50 p-6 transition-shadow hover:shadow-[0_8px_30px_hsla(36,30%,50%,0.08)]"
               >
                 <div className="mb-3 text-gold">{feature.icon}</div>
                 <h2 className="font-[family-name:var(--font-space-grotesk)] text-[15px] font-semibold text-foreground">
@@ -105,8 +96,8 @@ export default function Home() {
         </div>
       </section>
 
-      {/* How it works */}
-      <section className="border-t border-border bg-white px-4 py-16 sm:px-6 sm:py-20">
+      {/* How it works — cream background */}
+      <section className="border-t border-border bg-cream px-4 py-16 sm:px-6 sm:py-20">
         <div className="mx-auto max-w-5xl">
           <h2 className="font-[family-name:var(--font-space-grotesk)] text-lg font-semibold text-foreground">
             Hoe werkt het?
@@ -130,7 +121,7 @@ export default function Home() {
               },
             ].map((item) => (
               <div key={item.step} className="flex gap-4">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold/10 font-[family-name:var(--font-space-grotesk)] text-sm font-bold text-gold">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-gold/10 font-[family-name:var(--font-space-grotesk)] text-sm font-bold text-gold-dark">
                   {item.step}
                 </div>
                 <div>

@@ -25,10 +25,8 @@ export default function SearchBar({
   return (
     <form onSubmit={handleSubmit} className="w-full" role="search">
       <div
-        className={`relative flex items-center overflow-hidden rounded-2xl border bg-white shadow-[0_4px_20px_hsla(213,71%,13%,0.08)] transition-shadow focus-within:shadow-[0_8px_30px_hsla(213,71%,13%,0.15)] ${
-          hero
-            ? "h-14 border-white/20"
-            : "h-12 border-border"
+        className={`relative flex items-center overflow-hidden rounded-2xl border border-border bg-white shadow-[0_4px_20px_hsla(36,30%,50%,0.06)] transition-shadow focus-within:shadow-[0_8px_30px_hsla(36,30%,50%,0.12)] ${
+          hero ? "h-14" : "h-12"
         }`}
       >
         <div className="pointer-events-none flex items-center pl-4 text-gold">
@@ -51,7 +49,7 @@ export default function SearchBar({
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Beschrijf wie u zoekt, bijv. 'directeur in de energiesector'"
-          className={`flex-1 bg-transparent px-3 text-navy placeholder:text-navy/30 focus:outline-none ${
+          className={`flex-1 bg-transparent px-3 text-foreground placeholder:text-foreground/25 focus:outline-none ${
             hero ? "text-[15px]" : "text-sm"
           }`}
           data-testid="input-search"
@@ -60,7 +58,7 @@ export default function SearchBar({
         <button
           type="submit"
           disabled={!query.trim()}
-          className="mr-2 flex h-9 items-center justify-center rounded-xl bg-navy px-5 text-[13px] font-medium text-white transition-all hover:bg-navy-light disabled:opacity-30 disabled:cursor-not-allowed"
+          className="mr-2 flex h-9 items-center justify-center rounded-xl bg-foreground px-5 text-[13px] font-medium text-white transition-all hover:bg-foreground/85 disabled:opacity-30 disabled:cursor-not-allowed"
           data-testid="button-search"
         >
           Zoeken

@@ -20,65 +20,61 @@
   --color-gold: var(--gold);
   --color-gold-light: var(--gold-light);
   --color-gold-dark: var(--gold-dark);
-  --color-navy: var(--navy);
-  --color-navy-light: var(--navy-light);
   --color-cream: var(--cream);
+  --color-warm-gray: var(--warm-gray);
   --font-sans: var(--font-inter);
   --font-display: var(--font-space-grotesk);
   --font-mono: var(--font-geist-mono);
 }
 
-/* Novion Capital Design System */
+/* Novion Capital Design — White/Cream/Gold palette */
 :root {
-  /* Navy */
-  --navy: #091e38;
-  --navy-light: #0a2342;
-
   /* Gold */
   --gold: #c4a56a;
   --gold-light: #d7b878;
   --gold-dark: #a67c3f;
 
-  /* Cream backgrounds */
+  /* Warm neutrals */
   --cream: #faf7ef;
+  --warm-gray: #2d2d2d;
 
-  /* Surfaces */
+  /* Surfaces — white and cream, no navy */
   --background: #ffffff;
-  --foreground: #091e38;
+  --foreground: #1a1a1a;
   --card: #ffffff;
-  --card-foreground: #091e38;
-  --primary: #091e38;
+  --card-foreground: #1a1a1a;
+  --primary: #1a1a1a;
   --primary-foreground: #ffffff;
-  --muted: #f3f0e6;
-  --muted-foreground: #64748b;
-  --border: #e5e7eb;
+  --muted: #f5f2ea;
+  --muted-foreground: #7a7568;
+  --border: #e8e4da;
   --accent: #c4a56a;
   --accent-foreground: #ffffff;
-  --surface: #f3f0e6;
+  --surface: #f5f2ea;
   --surface-hover: #ebe7db;
   --success: #1a6e74;
   --score-bar: #c4a56a;
-  --score-bg: #f3f0e6;
+  --score-bg: #f5f2ea;
 }
 
 @media (prefers-color-scheme: dark) {
   :root {
-    --background: #091e38;
+    --background: #1a1a1a;
     --foreground: #e8e6e1;
-    --card: #0a2342;
+    --card: #242424;
     --card-foreground: #e8e6e1;
     --primary: #c4a56a;
-    --primary-foreground: #091e38;
-    --muted: #112a4a;
-    --muted-foreground: #94a3b8;
-    --border: #1e3a5f;
+    --primary-foreground: #1a1a1a;
+    --muted: #2d2d2d;
+    --muted-foreground: #a09a8f;
+    --border: #3a3a3a;
     --accent: #d7b878;
-    --accent-foreground: #091e38;
-    --surface: #112a4a;
-    --surface-hover: #1a3d5c;
+    --accent-foreground: #1a1a1a;
+    --surface: #2d2d2d;
+    --surface-hover: #3a3a3a;
     --success: #2dd4bf;
     --score-bar: #d7b878;
-    --score-bg: #112a4a;
+    --score-bg: #2d2d2d;
   }
 }
 
@@ -110,7 +106,7 @@ body {
   border-radius: 0.375rem;
 }
 
-/* Gold gradient text utility */
+/* Gold gradient text */
 .text-gold-gradient {
   background: linear-gradient(90deg, #d7b878 0%, #c9a463 40%, #a67c3f 100%);
   -webkit-background-clip: text;
@@ -124,12 +120,7 @@ body {
 }
 
 .skeleton {
-  background: linear-gradient(
-    90deg,
-    var(--muted) 25%,
-    var(--surface-hover) 50%,
-    var(--muted) 75%
-  );
+  background: linear-gradient(90deg, var(--muted) 25%, var(--surface-hover) 50%, var(--muted) 75%);
   background-size: 200% 100%;
   animation: shimmer 1.5s ease-in-out infinite;
   border-radius: 0.375rem;
