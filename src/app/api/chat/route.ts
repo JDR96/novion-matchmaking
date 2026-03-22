@@ -18,20 +18,22 @@ const SYSTEM_PROMPT = `Je bent de matchmaking-assistent van Novion Capital. Je h
 
 Gedragsregels:
 - Communiceer altijd in het Nederlands
-- Als een zoekvraag vaag is, stel dan eerst verhelderende vragen voordat je zoekt. Vraag bijvoorbeeld naar: sector, land/regio, type functie, specifieke expertise
-- Als je genoeg context hebt, gebruik dan de search_contacts tool om te zoeken
-- Gebruik search_web om actuele informatie over bedrijven of organisaties van gevonden contacten op te zoeken
-- Presenteer resultaten met gedetailleerde, onderbouwde uitleg waarom iemand relevant is
-- Wanneer je contacten presenteert, embed ze als een speciaal JSON-blok zodat de frontend ze als kaarten kan renderen
+- Als een zoekvraag vaag is, stel dan eerst 1-2 verhelderende vragen voordat je zoekt. Vraag bijvoorbeeld naar: sector, land/regio, type functie, specifieke expertise. Stel niet te veel vragen, wees efficiënt.
+- Als je genoeg context hebt, gebruik dan search_contacts om te zoeken
+- Na het vinden van contacten, gebruik search_web om actuele informatie over hun bedrijven/organisaties op te zoeken (nieuws, jaarverslagen, projecten)
 - Wees professioneel maar toegankelijk
 - Als er geen resultaten zijn, stel dan alternatieve zoektermen voor
 
-Wanneer je contactresultaten presenteert, gebruik dan ALTIJD dit exacte formaat om ze in te bedden:
-<!--CONTACTS_START-->
-[array van contact-objecten in JSON]
-<!--CONTACTS_END-->
-
-Schrijf daarna een korte toelichting per contact waarom die persoon relevant is, inclusief eventuele informatie die je via search_web hebt gevonden over hun organisatie.`;
+Belangrijk over contactresultaten:
+- De contactkaarten worden AUTOMATISCH als klikbare kaarten weergegeven in de interface. Je hoeft ze NIET zelf als JSON of in een speciaal formaat te presenteren.
+- Geef NA de contactkaarten een uitgebreide toelichting per gevonden contact:
+  1. Waarom deze persoon relevant is voor de zoekvraag
+  2. Wat hun organisatie doet (gebruik info uit search_web)
+  3. Recente ontwikkelingen of projecten van de organisatie die relevant zijn
+  4. Hoe deze persoon concreet kan bijdragen aan het doel van de gebruiker
+- Nummer de contacten (1, 2, 3, etc.) en gebruik hun naam in bold (**Naam**)
+- Schrijf minstens 2-3 zinnen toelichting per contact
+- Gebruik GEEN <!--CONTACTS_START--> of andere markers in je tekst, dat regelt het systeem`;
 
 interface ChatMessage {
   role: "user" | "assistant";
@@ -309,10 +311,11 @@ export async function POST(request: NextRequest) {
       })),
     ];
 
-    // Use a loop for tool calls — stream the final response
+    // Tool call loop — collect contact results, then stream final response
     let toolCallLoop = true;
     const maxToolCalls = 6;
     let toolCallCount = 0;
+    let collectedContacts: unknown[] = []; // Collect contacts from tool calls
 
     while (toolCallLoop && toolCallCount < maxToolCalls) {
       const response = await oai.chat.completions.create({
@@ -331,10 +334,8 @@ export async function POST(request: NextRequest) {
         message.tool_calls &&
         message.tool_calls.length > 0
       ) {
-        // Add assistant message with tool calls
         openaiMessages.push(message);
 
-        // Execute each tool call
         for (const toolCall of message.tool_calls) {
           if (toolCall.type !== "function") continue;
 
@@ -347,6 +348,13 @@ export async function POST(request: NextRequest) {
               args.query,
               args.limit || 5
             );
+            // Extract contacts from result for frontend rendering
+            try {
+              const parsed = JSON.parse(result);
+              if (parsed.results && parsed.results.length > 0) {
+                collectedContacts = [...collectedContacts, ...parsed.results];
+              }
+            } catch { /* ignore parse errors */ }
           } else if (fn.name === "search_web") {
             result = await executeSearchWeb(args.query);
           } else {
@@ -362,50 +370,11 @@ export async function POST(request: NextRequest) {
 
         toolCallCount++;
       } else {
-        // Final response — stream it
         toolCallLoop = false;
-
-        // Now do a streaming call for the final answer
-        const stream = await oai.chat.completions.create({
-          model: "gpt-4o",
-          messages: openaiMessages,
-          stream: true,
-          temperature: 0.7,
-        });
-
-        const encoder = new TextEncoder();
-
-        const readable = new ReadableStream({
-          async start(controller) {
-            try {
-              for await (const chunk of stream) {
-                const delta = chunk.choices[0]?.delta?.content;
-                if (delta) {
-                  controller.enqueue(
-                    encoder.encode(`data: ${JSON.stringify({ content: delta })}\n\n`)
-                  );
-                }
-              }
-              controller.enqueue(encoder.encode("data: [DONE]\n\n"));
-              controller.close();
-            } catch (err) {
-              console.error("Stream error:", err);
-              controller.error(err);
-            }
-          },
-        });
-
-        return new Response(readable, {
-          headers: {
-            "Content-Type": "text/event-stream",
-            "Cache-Control": "no-cache",
-            Connection: "keep-alive",
-          },
-        });
       }
     }
 
-    // If we exhausted tool calls, do a final streaming response
+    // Stream the final response, injecting contact cards at the start
     const stream = await oai.chat.completions.create({
       model: "gpt-4o",
       messages: openaiMessages,
@@ -418,6 +387,15 @@ export async function POST(request: NextRequest) {
     const readable = new ReadableStream({
       async start(controller) {
         try {
+          // Inject collected contacts as a card block BEFORE the text response
+          if (collectedContacts.length > 0) {
+            const contactsBlock = `<!--CONTACTS_START-->${JSON.stringify(collectedContacts)}<!--CONTACTS_END-->\n\n`;
+            controller.enqueue(
+              encoder.encode(`data: ${JSON.stringify({ content: contactsBlock })}\n\n`)
+            );
+          }
+
+          // Stream the model's text response
           for await (const chunk of stream) {
             const delta = chunk.choices[0]?.delta?.content;
             if (delta) {
