@@ -144,3 +144,23 @@ body {
 .animate-pulse-ring {
   animation: pulse-ring 2s cubic-bezier(0.4, 0, 0.6, 1) infinite;
 }
+
+/* Typing indicator dots */
+@keyframes typing-bounce {
+  0%, 60%, 100% { transform: translateY(0); opacity: 0.4; }
+  30% { transform: translateY(-4px); opacity: 1; }
+}
+
+.typing-dot {
+  animation: typing-bounce 1.2s ease-in-out infinite;
+}
+
+/* Chat prose styles */
+.prose-chat strong {
+  font-weight: 600;
+  color: var(--foreground);
+}
+
+.prose-chat em {
+  font-style: italic;
+}

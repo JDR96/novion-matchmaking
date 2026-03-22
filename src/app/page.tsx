@@ -1,15 +1,15 @@
-import SearchBar from "@/components/SearchBar";
+import HeroChatInput from "@/components/HeroChatInput";
 import Image from "next/image";
+import Link from "next/link";
 
 const features = [
   {
-    title: "Vector Search",
+    title: "AI Chat Assistent",
     description:
-      "Zoek in natuurlijke taal. AI begrijpt de context en vindt de meest relevante contacten uit ons netwerk.",
+      "Stel uw vraag in natuurlijke taal. Onze AI-assistent begrijpt context, stelt verhelderende vragen en vindt de beste matches.",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <circle cx="11" cy="11" r="8" />
-        <line x1="21" y1="21" x2="16.65" y2="16.65" />
+        <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
       </svg>
     ),
   },
@@ -27,14 +27,14 @@ const features = [
     ),
   },
   {
-    title: "Match Scoring",
+    title: "Web Research",
     description:
-      "Elke match krijgt een relevantiescore op basis van cosine similarity met uw zoekvraag.",
+      "Bij elke match zoekt de assistent actuele informatie over de organisatie, zodat u direct context heeft.",
     icon: (
       <svg width="22" height="22" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round">
-        <line x1="18" y1="20" x2="18" y2="10" />
-        <line x1="12" y1="20" x2="12" y2="4" />
-        <line x1="6" y1="20" x2="6" y2="14" />
+        <circle cx="12" cy="12" r="10" />
+        <line x1="2" y1="12" x2="22" y2="12" />
+        <path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z" />
       </svg>
     ),
   },
@@ -64,12 +64,26 @@ export default function Home() {
             <span className="text-gold-gradient">Intelligence</span>
           </h1>
           <p className="mt-4 text-[15px] leading-relaxed text-muted-foreground">
-            Beschrijf in het Nederlands wie u zoekt. Ons systeem doorzoekt
-            17.500+ contacten via AI-gestuurde vector search en toont de meest
-            relevante matches uit uw netwerk.
+            Beschrijf wie u zoekt en onze AI-assistent vindt de beste matches
+            uit 17.500+ contacten — inclusief actuele bedrijfsinformatie.
           </p>
+
+          {/* Chat input that navigates to /zoeken */}
           <div className="mx-auto mt-10 max-w-xl">
-            <SearchBar hero />
+            <HeroChatInput />
+          </div>
+
+          {/* Or direct link */}
+          <div className="mt-4">
+            <Link
+              href="/zoeken"
+              className="inline-flex items-center gap-2 rounded-full px-5 py-2.5 text-sm font-medium text-foreground transition-colors hover:bg-foreground/5"
+            >
+              <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
+              </svg>
+              Start een gesprek
+            </Link>
           </div>
         </div>
       </section>
@@ -106,18 +120,18 @@ export default function Home() {
             {[
               {
                 step: "1",
-                title: "Beschrijf uw zoekvraag",
-                desc: "Typ in het Nederlands wie u zoekt. Bijvoorbeeld: 'iemand met ervaring in maritime logistics'.",
+                title: "Stel uw vraag",
+                desc: "Beschrijf in het Nederlands wie u zoekt. Onze AI stelt verhelderende vragen als uw vraag breed is.",
               },
               {
                 step: "2",
-                title: "AI genereert embeddings",
-                desc: "Uw zoekvraag wordt omgezet naar een vector via OpenAI en vergeleken met 17.500+ contact-embeddings.",
+                title: "AI zoekt & verrijkt",
+                desc: "De assistent doorzoekt 17.500+ contacten via vector search en zoekt actuele informatie over relevante organisaties.",
               },
               {
                 step: "3",
-                title: "Top matches",
-                desc: "U krijgt de meest relevante contacten, gesorteerd op similarity met naam, functie, sector en motivatie.",
+                title: "Resultaten met context",
+                desc: "U krijgt contactkaarten met match-scores én een onderbouwde toelichting waarom iemand relevant is.",
               },
             ].map((item) => (
               <div key={item.step} className="flex gap-4">

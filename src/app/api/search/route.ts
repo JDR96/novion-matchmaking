@@ -2,15 +2,16 @@ import { NextRequest, NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import OpenAI from "openai";
 
-const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-const supabaseKey =
-  process.env.SUPABASE_SERVICE_ROLE_KEY ||
-  process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
-const supabase = createClient(supabaseUrl, supabaseKey);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
-const openai = new OpenAI({
-  apiKey: process.env.OPENAI_API_KEY!,
-});
+function getOpenAI() {
+  return new OpenAI({ apiKey: process.env.OPENAI_API_KEY! });
+}
 
 function buildLocation(stad: string | null, land: string | null): string | null {
   const parts = [stad, land].filter(Boolean);
@@ -85,14 +86,14 @@ export async function POST(request: NextRequest) {
       Math.max(10, parseInt(requestedLimit) || 10)
     );
 
-    const embeddingResponse = await openai.embeddings.create({
+    const embeddingResponse = await getOpenAI().embeddings.create({
       model: "text-embedding-3-small",
       input: query.trim(),
     });
 
     const queryEmbedding = embeddingResponse.data[0].embedding;
 
-    const { data, error } = await supabase.rpc("match_contacts", {
+    const { data, error } = await getSupabase().rpc("match_contacts", {
       query_embedding: queryEmbedding,
       match_threshold: 0.0,
       match_count: matchCount,
@@ -115,7 +116,7 @@ export async function POST(request: NextRequest) {
     }
 
     const matchedIds = data.map((d: Record<string, unknown>) => d.id);
-    const { data: fullContacts } = await supabase
+    const { data: fullContacts } = await getSupabase()
       .from("contacts")
       .select(
         "id, volledige_naam, organisatie, functie, sector, expertise, tags, bio, functieniveau, suriname_score, email_1, email_2, telefoon_1, telefoon_2, linkedin_url, stad, land, bron"
