@@ -175,6 +175,18 @@ export default function ContactDetailModal({
                         </svg>
                       </span>
                     )}
+                    {contact.notes?.includes("[mogelijk-duplicaat]") && (
+                      <span
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-blue-50 text-blue-500 dark:bg-blue-900/20 dark:text-blue-400"
+                        title={contact.notes.replace("[mogelijk-duplicaat] ", "")}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <rect width="8" height="10" x="2" y="4" rx="1" />
+                          <rect width="8" height="10" x="14" y="10" rx="1" />
+                          <path d="M10 4v10" />
+                        </svg>
+                      </span>
+                    )}
                   </div>
                   {contact.job_title && (
                     <p className="text-sm text-muted-foreground">
