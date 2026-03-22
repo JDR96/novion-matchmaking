@@ -9,6 +9,8 @@ import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import { ContactResult, SearchResponse } from "@/types/contact";
 
+const RESULT_OPTIONS = [10, 25, 50] as const;
+
 function SearchContent() {
   const searchParams = useSearchParams();
   const queryParam = searchParams.get("q") || "";
@@ -18,46 +20,57 @@ function SearchContent() {
   const [error, setError] = useState<string | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
   const [currentQuery, setCurrentQuery] = useState("");
+  const [resultLimit, setResultLimit] = useState<number>(10);
 
-  const executeSearch = useCallback(async (query: string) => {
-    if (!query.trim()) return;
+  const executeSearch = useCallback(
+    async (query: string, limit: number = 10) => {
+      if (!query.trim()) return;
 
-    setIsLoading(true);
-    setError(null);
-    setHasSearched(true);
-    setCurrentQuery(query);
+      setIsLoading(true);
+      setError(null);
+      setHasSearched(true);
+      setCurrentQuery(query);
 
-    try {
-      const response = await fetch("/api/search", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ query: query.trim() }),
-      });
+      try {
+        const response = await fetch("/api/search", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ query: query.trim(), limit }),
+        });
 
-      if (!response.ok) {
-        const data = await response.json().catch(() => ({}));
-        throw new Error(data.error || `Fout (${response.status})`);
+        if (!response.ok) {
+          const data = await response.json().catch(() => ({}));
+          throw new Error(data.error || `Fout (${response.status})`);
+        }
+
+        const data: SearchResponse = await response.json();
+        setResults(data.results);
+      } catch (err) {
+        setError(
+          err instanceof Error
+            ? err.message
+            : "Er ging iets mis bij het ophalen van de resultaten."
+        );
+        setResults([]);
+      } finally {
+        setIsLoading(false);
       }
-
-      const data: SearchResponse = await response.json();
-      setResults(data.results);
-    } catch (err) {
-      setError(
-        err instanceof Error
-          ? err.message
-          : "Er ging iets mis bij het ophalen van de resultaten."
-      );
-      setResults([]);
-    } finally {
-      setIsLoading(false);
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     if (queryParam) {
-      executeSearch(queryParam);
+      executeSearch(queryParam, resultLimit);
     }
-  }, [queryParam, executeSearch]);
+  }, [queryParam, executeSearch, resultLimit]);
+
+  function handleLimitChange(newLimit: number) {
+    setResultLimit(newLimit);
+    if (currentQuery) {
+      executeSearch(currentQuery, newLimit);
+    }
+  }
 
   return (
     <div className="mx-auto w-full max-w-3xl px-4 py-8 sm:px-6">
@@ -66,7 +79,7 @@ function SearchContent() {
         <SearchBar initialQuery={queryParam} />
       </div>
 
-      {/* Results header */}
+      {/* Results header with count selector */}
       {hasSearched && !isLoading && !error && (
         <div className="mb-4 flex items-center justify-between">
           <p className="text-sm text-muted-foreground">
@@ -80,6 +93,27 @@ function SearchContent() {
               </>
             ) : null}
           </p>
+
+          {/* Result count selector */}
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground">Toon:</span>
+            <div className="flex rounded-lg border border-border bg-card">
+              {RESULT_OPTIONS.map((opt) => (
+                <button
+                  key={opt}
+                  onClick={() => handleLimitChange(opt)}
+                  className={`px-2.5 py-1 text-xs font-medium transition-colors first:rounded-l-lg last:rounded-r-lg ${
+                    resultLimit === opt
+                      ? "bg-primary text-primary-foreground"
+                      : "text-muted-foreground hover:bg-muted hover:text-foreground"
+                  }`}
+                  data-testid={`button-limit-${opt}`}
+                >
+                  {opt}
+                </button>
+              ))}
+            </div>
+          </div>
         </div>
       )}
 
@@ -96,7 +130,7 @@ function SearchContent() {
       {!isLoading && error && (
         <ErrorState
           message={error}
-          onRetry={() => executeSearch(currentQuery)}
+          onRetry={() => executeSearch(currentQuery, resultLimit)}
         />
       )}
 
@@ -114,7 +148,7 @@ function SearchContent() {
         </div>
       )}
 
-      {/* Initial state: no search yet */}
+      {/* Initial state */}
       {!hasSearched && !isLoading && (
         <div className="flex flex-col items-center py-16 text-center">
           <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-full bg-muted">

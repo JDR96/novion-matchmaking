@@ -26,8 +26,7 @@ function buildMotivation(
   bio: string,
   surinameScore: number | null
 ): string {
-  // If bio is substantial (not just a generic template), use it
-  if (bio && bio.length > 30 && !bio.startsWith(`${name} is `) ) {
+  if (bio && bio.length > 30 && !bio.startsWith(`${name} is `)) {
     return bio;
   }
 
@@ -71,7 +70,7 @@ function buildMotivation(
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
-    const { query, filters } = body;
+    const { query, filters, limit: requestedLimit } = body;
 
     if (!query || typeof query !== "string" || query.trim().length === 0) {
       return NextResponse.json(
@@ -80,7 +79,12 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Generate embedding for the search query
+    // Allow configurable result count (10, 25, or 50)
+    const matchCount = Math.min(
+      50,
+      Math.max(10, parseInt(requestedLimit) || 10)
+    );
+
     const embeddingResponse = await openai.embeddings.create({
       model: "text-embedding-3-small",
       input: query.trim(),
@@ -88,11 +92,10 @@ export async function POST(request: NextRequest) {
 
     const queryEmbedding = embeddingResponse.data[0].embedding;
 
-    // Call the match_contacts RPC function for vector similarity search
     const { data, error } = await supabase.rpc("match_contacts", {
       query_embedding: queryEmbedding,
       match_threshold: 0.0,
-      match_count: 10,
+      match_count: matchCount,
     });
 
     if (error) {
@@ -111,7 +114,6 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fetch full contact data for matched IDs
     const matchedIds = data.map((d: Record<string, unknown>) => d.id);
     const { data: fullContacts } = await supabase
       .from("contacts")
@@ -120,7 +122,6 @@ export async function POST(request: NextRequest) {
       )
       .in("id", matchedIds);
 
-    // Create lookup maps
     const contactMap = new Map<number, Record<string, unknown>>();
     if (fullContacts) {
       for (const c of fullContacts) {
@@ -138,16 +139,13 @@ export async function POST(request: NextRequest) {
       );
     }
 
-    // Transform results with full contact details
     const results = matchedIds.map((id: number) => {
       const full = (contactMap.get(id) || {}) as Record<string, unknown>;
       const rpcRow = (data.find((d: Record<string, unknown>) => d.id === id) ||
         {}) as Record<string, unknown>;
       const similarity = similarityMap.get(id) || 0;
 
-      const name = String(
-        full.volledige_naam || rpcRow.volledige_naam || "Onbekend"
-      );
+      const name = String(full.volledige_naam || rpcRow.volledige_naam || "Onbekend");
       const org = String(full.organisatie || rpcRow.organisatie || "");
       const title = String(full.functie || rpcRow.functie || "");
       const sector = String(full.sector || rpcRow.sector || "");
@@ -160,12 +158,9 @@ export async function POST(request: NextRequest) {
           : null;
       const tags = String(full.tags || "");
 
-      // Contact details
       const email = full.email_1 ? String(full.email_1) : null;
       const phone = full.telefoon_1 ? String(full.telefoon_1) : null;
-      const linkedinUrl = full.linkedin_url
-        ? String(full.linkedin_url)
-        : null;
+      const linkedinUrl = full.linkedin_url ? String(full.linkedin_url) : null;
       const location = buildLocation(
         full.stad ? String(full.stad) : null,
         full.land ? String(full.land) : null
@@ -175,32 +170,20 @@ export async function POST(request: NextRequest) {
       // Build labels
       const labels: string[] = [];
       if (sector && sector !== "Other" && sector !== "null") {
-        // Split multi-sector (e.g. "Education/Research, Technology")
         const sectorParts = sector.split(",").map((s: string) => s.trim());
         for (const sp of sectorParts) {
-          if (sp && sp !== "Other" && !labels.includes(sp)) {
-            labels.push(sp);
-          }
+          if (sp && sp !== "Other" && !labels.includes(sp)) labels.push(sp);
         }
       }
       if (expertise && expertise !== "Other" && expertise !== "null") {
         const expParts = expertise.split(",").map((t: string) => t.trim());
         for (const part of expParts) {
-          if (part && part !== "Other" && !labels.includes(part)) {
-            labels.push(part);
-          }
+          if (part && part !== "Other" && !labels.includes(part)) labels.push(part);
         }
       }
-      if (
-        functieniveau &&
-        functieniveau !== "Other" &&
-        functieniveau !== "null"
-      ) {
-        if (!labels.includes(functieniveau)) {
-          labels.push(functieniveau);
-        }
+      if (functieniveau && functieniveau !== "Other" && functieniveau !== "null") {
+        if (!labels.includes(functieniveau)) labels.push(functieniveau);
       }
-      // Parse country from tags
       if (tags && tags !== "null") {
         const tagParts = tags.split(",").map((t: string) => t.trim());
         for (const tag of tagParts) {
@@ -212,23 +195,11 @@ export async function POST(request: NextRequest) {
           }
         }
       }
-      // Suriname relevance badge
       if (surinameScore !== null && surinameScore >= 0.6) {
-        if (!labels.includes("Suriname")) {
-          labels.unshift("Suriname");
-        }
+        if (!labels.includes("Suriname")) labels.unshift("Suriname");
       }
 
-      // Build motivation
-      const motivation = buildMotivation(
-        name,
-        title,
-        org,
-        sector,
-        expertise,
-        bio,
-        surinameScore
-      );
+      const motivation = buildMotivation(name, title, org, sector, expertise, bio, surinameScore);
 
       return {
         id,
@@ -249,7 +220,6 @@ export async function POST(request: NextRequest) {
       };
     });
 
-    // Apply optional client-side filters
     let filtered = results;
     if (filters?.sector) {
       filtered = filtered.filter(
@@ -266,10 +236,7 @@ export async function POST(request: NextRequest) {
   } catch (err) {
     console.error("Search API error:", err);
     return NextResponse.json(
-      {
-        error:
-          "Er ging iets mis. Controleer de configuratie en probeer het opnieuw.",
-      },
+      { error: "Er ging iets mis. Controleer de configuratie en probeer het opnieuw." },
       { status: 500 }
     );
   }
