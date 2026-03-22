@@ -1,8 +1,8 @@
 "use client";
 
 import { useEffect, useState, useCallback } from "react";
-import SkeletonCard from "@/components/SkeletonCard";
 import ErrorState from "@/components/ErrorState";
+import ContactDetailModal from "@/components/ContactDetailModal";
 
 interface Contact {
   id: number;
@@ -41,6 +41,7 @@ export default function ContactenPage() {
   const [search, setSearch] = useState("");
   const [searchInput, setSearchInput] = useState("");
   const [sectorFilter, setSectorFilter] = useState("");
+  const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
 
   const fetchContacts = useCallback(async () => {
     setIsLoading(true);
@@ -239,8 +240,9 @@ export default function ContactenPage() {
                 {contacts.map((contact) => (
                   <tr
                     key={contact.id}
-                    className="border-b border-border/50 transition-colors last:border-0 hover:bg-muted/30"
+                    className="cursor-pointer border-b border-border/50 transition-colors last:border-0 hover:bg-muted/30"
                     data-testid={`row-contact-${contact.id}`}
+                    onClick={() => setSelectedContactId(contact.id)}
                   >
                     {/* Name + mobile details */}
                     <td className="px-4 py-3">
@@ -289,7 +291,8 @@ export default function ContactenPage() {
                       )}
                     </td>
                     {/* Action links */}
-                    <td className="px-4 py-3">
+                    {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-noninteractive-element-interactions */}
+                    <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
                       <div className="flex items-center justify-end gap-1">
                         {contact.email && (
                           <a
@@ -455,6 +458,12 @@ export default function ContactenPage() {
           </p>
         </div>
       )}
+
+      {/* Contact detail modal */}
+      <ContactDetailModal
+        contactId={selectedContactId}
+        onClose={() => setSelectedContactId(null)}
+      />
     </div>
   );
 }

@@ -8,6 +8,7 @@ import SkeletonCard from "@/components/SkeletonCard";
 import EmptyState from "@/components/EmptyState";
 import ErrorState from "@/components/ErrorState";
 import { ContactResult, SearchResponse } from "@/types/contact";
+import ContactDetailModal from "@/components/ContactDetailModal";
 
 const RESULT_OPTIONS = [10, 25, 50] as const;
 
@@ -21,6 +22,7 @@ function SearchContent() {
   const [hasSearched, setHasSearched] = useState(false);
   const [currentQuery, setCurrentQuery] = useState("");
   const [resultLimit, setResultLimit] = useState<number>(10);
+  const [selectedContactId, setSelectedContactId] = useState<number | null>(null);
 
   const executeSearch = useCallback(
     async (query: string, limit: number = 10) => {
@@ -143,7 +145,7 @@ function SearchContent() {
       {!isLoading && !error && results.length > 0 && (
         <div className="space-y-3" data-testid="results-list">
           {results.map((contact, i) => (
-            <ContactCard key={contact.id} contact={contact} rank={i + 1} />
+            <ContactCard key={contact.id} contact={contact} rank={i + 1} onSelect={setSelectedContactId} />
           ))}
         </div>
       )}
@@ -176,6 +178,11 @@ function SearchContent() {
           </p>
         </div>
       )}
+      {/* Contact detail modal */}
+      <ContactDetailModal
+        contactId={selectedContactId}
+        onClose={() => setSelectedContactId(null)}
+      />
     </div>
   );
 }

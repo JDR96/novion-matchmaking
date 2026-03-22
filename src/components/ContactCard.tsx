@@ -6,9 +6,10 @@ import ScoreBar from "./ScoreBar";
 interface ContactCardProps {
   contact: ContactResult;
   rank: number;
+  onSelect?: (id: number) => void;
 }
 
-export default function ContactCard({ contact, rank }: ContactCardProps) {
+export default function ContactCard({ contact, rank, onSelect }: ContactCardProps) {
   const initials = contact.full_name
     .split(" ")
     .map((n) => n[0])
@@ -21,9 +22,13 @@ export default function ContactCard({ contact, rank }: ContactCardProps) {
 
   return (
     <article
-      className="animate-fade-in group rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md"
+      className="animate-fade-in group cursor-pointer rounded-xl border border-border bg-card p-5 transition-shadow hover:shadow-md"
       style={{ animationDelay: `${rank * 60}ms` }}
       data-testid={`card-contact-${contact.id}`}
+      onClick={() => onSelect?.(contact.id)}
+      role="button"
+      tabIndex={0}
+      onKeyDown={(e) => { if (e.key === 'Enter') onSelect?.(contact.id); }}
     >
       <div className="flex items-start gap-4">
         {/* Avatar */}
@@ -112,7 +117,8 @@ export default function ContactCard({ contact, rank }: ContactCardProps) {
           </p>
 
           {/* Contact details bar */}
-          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3">
+          {/* eslint-disable-next-line jsx-a11y/click-events-have-key-events, jsx-a11y/no-static-element-interactions */}
+          <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3" onClick={(e) => e.stopPropagation()}>
             {/* Email */}
             {contact.email && (
               <a
