@@ -11,6 +11,7 @@ import {
 } from "react";
 import ChatContactCard from "@/components/ChatContactCard";
 import ContactDetailModal from "@/components/ContactDetailModal";
+import ConversationSidebar from "@/components/ConversationSidebar";
 import { ContactResult } from "@/types/contact";
 
 interface Message {
@@ -73,6 +74,12 @@ function ChatContent() {
     null
   );
 
+  // Conversation history state
+  const [activeConversationId, setActiveConversationId] = useState<
+    string | null
+  >(null);
+  const [sidebarRefreshKey, setSidebarRefreshKey] = useState(0);
+
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const hasInitialQuery = useRef(false);
@@ -84,6 +91,49 @@ function ChatContent() {
   useEffect(() => {
     scrollToBottom();
   }, [messages, scrollToBottom]);
+
+  // Save a message to the API (fire-and-forget)
+  const saveMessage = useCallback(
+    async (
+      conversationId: string,
+      role: "user" | "assistant",
+      content: string,
+      contacts?: ContactResult[]
+    ) => {
+      try {
+        await fetch(`/api/conversations/${conversationId}/messages`, {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({
+            role,
+            content,
+            contacts: contacts && contacts.length > 0 ? contacts : null,
+          }),
+        });
+        // Refresh sidebar to update preview/title
+        setSidebarRefreshKey((k) => k + 1);
+      } catch {
+        // Silent fail — chat still works without history
+      }
+    },
+    []
+  );
+
+  // Create a new conversation and return its ID (or null on failure)
+  const createConversation = useCallback(async (): Promise<string | null> => {
+    try {
+      const res = await fetch("/api/conversations", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ title: "Nieuw gesprek" }),
+      });
+      if (!res.ok) return null;
+      const data = await res.json();
+      return data.conversation?.id || null;
+    } catch {
+      return null;
+    }
+  }, []);
 
   const sendMessage = useCallback(
     async (content: string) => {
@@ -105,6 +155,18 @@ function ChatContent() {
       setMessages((prev) => [...prev, userMessage, assistantMessage]);
       setInput("");
       setIsStreaming(true);
+
+      // Auto-save: create conversation if needed, save user message
+      let convId = activeConversationId;
+      if (!convId) {
+        convId = await createConversation();
+        if (convId) {
+          setActiveConversationId(convId);
+        }
+      }
+      if (convId) {
+        saveMessage(convId, "user", content.trim());
+      }
 
       try {
         const allMessages = [
@@ -181,6 +243,16 @@ function ChatContent() {
             )
           );
         }
+
+        // Auto-save assistant message after streaming complete
+        if (convId) {
+          saveMessage(
+            convId,
+            "assistant",
+            accumulated,
+            contacts.length > 0 ? contacts : undefined
+          );
+        }
       } catch (err) {
         const errorMsg =
           err instanceof Error
@@ -195,7 +267,13 @@ function ChatContent() {
         setIsStreaming(false);
       }
     },
-    [isStreaming, messages, scrollToBottom]
+    [
+      isStreaming,
+      messages,
+      activeConversationId,
+      createConversation,
+      saveMessage,
+    ]
   );
 
   // Handle initial query from URL
@@ -205,6 +283,52 @@ function ChatContent() {
       sendMessage(initialQuery);
     }
   }, [initialQuery, sendMessage]);
+
+  // Load an existing conversation
+  const loadConversation = useCallback(
+    async (id: string) => {
+      if (isStreaming) return;
+      try {
+        const res = await fetch(`/api/conversations/${id}`);
+        if (!res.ok) return;
+        const data = await res.json();
+
+        setActiveConversationId(id);
+
+        const loaded: Message[] = [WELCOME_MESSAGE];
+        for (const msg of data.messages || []) {
+          loaded.push({
+            id: msg.id,
+            role: msg.role,
+            content: msg.content,
+            contacts: msg.contacts || undefined,
+          });
+        }
+        setMessages(loaded);
+      } catch {
+        // Silent fail
+      }
+    },
+    [isStreaming]
+  );
+
+  // Start a new conversation
+  const startNewConversation = useCallback(() => {
+    if (isStreaming) return;
+    setActiveConversationId(null);
+    setMessages([WELCOME_MESSAGE]);
+    setInput("");
+  }, [isStreaming]);
+
+  // Handle deletion of the active conversation
+  const handleDeleteConversation = useCallback(
+    (id: string) => {
+      if (id === activeConversationId) {
+        startNewConversation();
+      }
+    },
+    [activeConversationId, startNewConversation]
+  );
 
   function handleSubmit(e: FormEvent) {
     e.preventDefault();
@@ -219,143 +343,155 @@ function ChatContent() {
   }
 
   return (
-    <div className="flex h-[calc(100vh-4rem)] flex-col">
-      {/* Messages area */}
-      <div className="flex-1 overflow-y-auto">
-        <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
-          {messages.map((message) => (
-            <div
-              key={message.id}
-              className={`mb-4 flex ${
-                message.role === "user" ? "justify-end" : "justify-start"
-              }`}
-            >
+    <div className="flex h-[calc(100vh-4rem)]">
+      {/* Sidebar */}
+      <ConversationSidebar
+        activeId={activeConversationId}
+        onSelect={loadConversation}
+        onNew={startNewConversation}
+        onDelete={handleDeleteConversation}
+        refreshKey={sidebarRefreshKey}
+      />
+
+      {/* Chat area */}
+      <div className="flex min-w-0 flex-1 flex-col">
+        {/* Messages area */}
+        <div className="flex-1 overflow-y-auto">
+          <div className="mx-auto max-w-2xl px-4 py-6 sm:px-6">
+            {messages.map((message) => (
               <div
-                className={`max-w-[85%] animate-fade-in ${
-                  message.role === "user"
-                    ? "rounded-2xl rounded-br-md bg-foreground px-4 py-3 text-sm text-white"
-                    : "space-y-3"
+                key={message.id}
+                className={`mb-4 flex ${
+                  message.role === "user" ? "justify-end" : "justify-start"
                 }`}
               >
-                {message.role === "assistant" ? (
-                  <>
-                    {/* Assistant icon + text */}
-                    <div className="flex items-start gap-3">
-                      <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10">
-                        <svg
-                          width="14"
-                          height="14"
-                          viewBox="0 0 24 24"
-                          fill="none"
-                          stroke="currentColor"
-                          strokeWidth="2"
-                          strokeLinecap="round"
-                          strokeLinejoin="round"
-                          className="text-gold-dark"
-                        >
-                          <circle cx="11" cy="11" r="8" />
-                          <line x1="21" y1="21" x2="16.65" y2="16.65" />
-                        </svg>
-                      </div>
-                      <div className="min-w-0 flex-1">
-                        {message.content ? (
-                          <div
-                            className="prose-chat text-sm leading-relaxed text-foreground/90"
-                            dangerouslySetInnerHTML={{
-                              __html: renderMarkdown(
-                                parseContactsFromContent(message.content)
-                                  .textContent
-                              ),
-                            }}
-                          />
-                        ) : isStreaming &&
-                          message.id ===
-                            messages[messages.length - 1]?.id ? (
-                          <div className="flex items-center gap-1.5 py-2">
-                            <div className="typing-dot h-2 w-2 rounded-full bg-gold/60" />
+                <div
+                  className={`max-w-[85%] animate-fade-in ${
+                    message.role === "user"
+                      ? "rounded-2xl rounded-br-md bg-foreground px-4 py-3 text-sm text-white"
+                      : "space-y-3"
+                  }`}
+                >
+                  {message.role === "assistant" ? (
+                    <>
+                      {/* Assistant icon + text */}
+                      <div className="flex items-start gap-3">
+                        <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-gold/10">
+                          <svg
+                            width="14"
+                            height="14"
+                            viewBox="0 0 24 24"
+                            fill="none"
+                            stroke="currentColor"
+                            strokeWidth="2"
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            className="text-gold-dark"
+                          >
+                            <circle cx="11" cy="11" r="8" />
+                            <line x1="21" y1="21" x2="16.65" y2="16.65" />
+                          </svg>
+                        </div>
+                        <div className="min-w-0 flex-1">
+                          {message.content ? (
                             <div
-                              className="typing-dot h-2 w-2 rounded-full bg-gold/60"
-                              style={{ animationDelay: "0.15s" }}
+                              className="prose-chat text-sm leading-relaxed text-foreground/90"
+                              dangerouslySetInnerHTML={{
+                                __html: renderMarkdown(
+                                  parseContactsFromContent(message.content)
+                                    .textContent
+                                ),
+                              }}
                             />
-                            <div
-                              className="typing-dot h-2 w-2 rounded-full bg-gold/60"
-                              style={{ animationDelay: "0.3s" }}
-                            />
-                          </div>
-                        ) : null}
+                          ) : isStreaming &&
+                            message.id ===
+                              messages[messages.length - 1]?.id ? (
+                            <div className="flex items-center gap-1.5 py-2">
+                              <div className="typing-dot h-2 w-2 rounded-full bg-gold/60" />
+                              <div
+                                className="typing-dot h-2 w-2 rounded-full bg-gold/60"
+                                style={{ animationDelay: "0.15s" }}
+                              />
+                              <div
+                                className="typing-dot h-2 w-2 rounded-full bg-gold/60"
+                                style={{ animationDelay: "0.3s" }}
+                              />
+                            </div>
+                          ) : null}
+                        </div>
                       </div>
-                    </div>
 
-                    {/* Contact cards */}
-                    {message.contacts && message.contacts.length > 0 && (
-                      <div className="ml-10 grid gap-2 sm:grid-cols-2">
-                        {message.contacts.map((contact) => (
-                          <ChatContactCard
-                            key={contact.id}
-                            contact={contact}
-                            onSelect={setSelectedContactId}
-                          />
-                        ))}
-                      </div>
-                    )}
-                  </>
-                ) : (
-                  <span>{message.content}</span>
-                )}
+                      {/* Contact cards */}
+                      {message.contacts && message.contacts.length > 0 && (
+                        <div className="ml-10 grid gap-2 sm:grid-cols-2">
+                          {message.contacts.map((contact) => (
+                            <ChatContactCard
+                              key={contact.id}
+                              contact={contact}
+                              onSelect={setSelectedContactId}
+                            />
+                          ))}
+                        </div>
+                      )}
+                    </>
+                  ) : (
+                    <span>{message.content}</span>
+                  )}
+                </div>
               </div>
-            </div>
-          ))}
-          <div ref={messagesEndRef} />
-        </div>
-      </div>
-
-      {/* Input bar */}
-      <div className="border-t border-border bg-white/95 backdrop-blur-sm">
-        <form
-          onSubmit={handleSubmit}
-          className="mx-auto flex max-w-2xl items-end gap-3 px-4 py-3 sm:px-6"
-        >
-          <div className="relative flex min-h-[44px] flex-1 items-center overflow-hidden rounded-2xl border border-border bg-white shadow-[0_2px_8px_hsla(36,30%,50%,0.04)] transition-shadow focus-within:shadow-[0_4px_16px_hsla(36,30%,50%,0.1)]">
-            <textarea
-              ref={inputRef}
-              value={input}
-              onChange={(e) => {
-                setInput(e.target.value);
-                // Auto-resize
-                e.target.style.height = "auto";
-                e.target.style.height =
-                  Math.min(e.target.scrollHeight, 120) + "px";
-              }}
-              onKeyDown={handleKeyDown}
-              placeholder="Beschrijf wie u zoekt..."
-              rows={1}
-              className="max-h-[120px] flex-1 resize-none bg-transparent px-4 py-2.5 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none"
-              disabled={isStreaming}
-              data-testid="input-chat"
-            />
+            ))}
+            <div ref={messagesEndRef} />
           </div>
-          <button
-            type="submit"
-            disabled={!input.trim() || isStreaming}
-            className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-foreground text-white transition-all hover:bg-foreground/85 disabled:opacity-30 disabled:cursor-not-allowed"
-            data-testid="button-send"
-            aria-label="Verstuur bericht"
+        </div>
+
+        {/* Input bar */}
+        <div className="border-t border-border bg-white/95 backdrop-blur-sm">
+          <form
+            onSubmit={handleSubmit}
+            className="mx-auto flex max-w-2xl items-end gap-3 px-4 py-3 sm:px-6"
           >
-            <svg
-              width="18"
-              height="18"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="2"
-              strokeLinecap="round"
-              strokeLinejoin="round"
+            <div className="relative flex min-h-[44px] flex-1 items-center overflow-hidden rounded-2xl border border-border bg-white shadow-[0_2px_8px_hsla(36,30%,50%,0.04)] transition-shadow focus-within:shadow-[0_4px_16px_hsla(36,30%,50%,0.1)]">
+              <textarea
+                ref={inputRef}
+                value={input}
+                onChange={(e) => {
+                  setInput(e.target.value);
+                  // Auto-resize
+                  e.target.style.height = "auto";
+                  e.target.style.height =
+                    Math.min(e.target.scrollHeight, 120) + "px";
+                }}
+                onKeyDown={handleKeyDown}
+                placeholder="Beschrijf wie u zoekt..."
+                rows={1}
+                className="max-h-[120px] flex-1 resize-none bg-transparent px-4 py-2.5 text-sm text-foreground placeholder:text-foreground/25 focus:outline-none"
+                disabled={isStreaming}
+                data-testid="input-chat"
+              />
+            </div>
+            <button
+              type="submit"
+              disabled={!input.trim() || isStreaming}
+              className="flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-foreground text-white transition-all hover:bg-foreground/85 disabled:opacity-30 disabled:cursor-not-allowed"
+              data-testid="button-send"
+              aria-label="Verstuur bericht"
             >
-              <line x1="22" y1="2" x2="11" y2="13" />
-              <polygon points="22 2 15 22 11 13 2 9 22 2" />
-            </svg>
-          </button>
-        </form>
+              <svg
+                width="18"
+                height="18"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
+                <line x1="22" y1="2" x2="11" y2="13" />
+                <polygon points="22 2 15 22 11 13 2 9 22 2" />
+              </svg>
+            </button>
+          </form>
+        </div>
       </div>
 
       {/* Contact detail modal */}
