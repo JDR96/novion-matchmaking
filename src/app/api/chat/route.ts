@@ -316,7 +316,7 @@ export async function POST(request: NextRequest) {
 
     while (toolCallLoop && toolCallCount < maxToolCalls) {
       const response = await oai.chat.completions.create({
-        model: "gpt-4o-mini",
+        model: "gpt-4o",
         messages: openaiMessages,
         tools,
         tool_choice: "auto",
@@ -367,7 +367,7 @@ export async function POST(request: NextRequest) {
 
         // Now do a streaming call for the final answer
         const stream = await oai.chat.completions.create({
-          model: "gpt-4o-mini",
+          model: "gpt-4o",
           messages: openaiMessages,
           stream: true,
           temperature: 0.7,
@@ -407,7 +407,7 @@ export async function POST(request: NextRequest) {
 
     // If we exhausted tool calls, do a final streaming response
     const stream = await oai.chat.completions.create({
-      model: "gpt-4o-mini",
+      model: "gpt-4o",
       messages: openaiMessages,
       stream: true,
       temperature: 0.7,
