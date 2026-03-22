@@ -12,6 +12,62 @@ const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY!,
 });
 
+function buildLocation(stad: string | null, land: string | null): string | null {
+  const parts = [stad, land].filter(Boolean);
+  return parts.length > 0 ? parts.join(", ") : null;
+}
+
+function buildMotivation(
+  name: string,
+  title: string,
+  org: string,
+  sector: string,
+  expertise: string,
+  bio: string,
+  surinameScore: number | null
+): string {
+  // If bio is substantial (not just a generic template), use it
+  if (bio && bio.length > 30 && !bio.startsWith(`${name} is `) ) {
+    return bio;
+  }
+
+  const parts: string[] = [];
+
+  if (title && org) {
+    parts.push(`${title} bij ${org}`);
+  } else if (title) {
+    parts.push(title);
+  } else if (org) {
+    parts.push(`werkzaam bij ${org}`);
+  }
+
+  if (sector && sector !== "Other") {
+    parts.push(`actief in de ${sector}-sector`);
+  }
+
+  if (expertise && expertise !== "Other" && expertise !== sector) {
+    const expertiseParts = expertise
+      .split(",")
+      .map((e: string) => e.trim())
+      .filter((e: string) => e && e !== "Other" && e !== sector);
+    if (expertiseParts.length > 0) {
+      parts.push(`expertise in ${expertiseParts.slice(0, 2).join(" en ")}`);
+    }
+  }
+
+  if (surinameScore !== null && surinameScore >= 0.6) {
+    parts.push("directe Suriname-relevantie");
+  } else if (surinameScore !== null && surinameScore >= 0.4) {
+    parts.push("potentieel Suriname-relevant");
+  }
+
+  if (parts.length === 0) {
+    return `${name} komt overeen met uw zoekcriteria.`;
+  }
+
+  return `${name}: ${parts.join(". ")}.`;
+}
+
 export async function POST(request: NextRequest) {
   try {
     const body = await request.json();
@@ -33,7 +89,6 @@ export async function POST(request: NextRequest) {
     const queryEmbedding = embeddingResponse.data[0].embedding;
 
     // Call the match_contacts RPC function for vector similarity search
-    // The RPC returns: id, volledige_naam, organisatie, functie, sector, bio, similarity
     const { data, error } = await supabase.rpc("match_contacts", {
       query_embedding: queryEmbedding,
       match_threshold: 0.0,
@@ -56,16 +111,16 @@ export async function POST(request: NextRequest) {
       });
     }
 
-    // Fetch full contact data (including expertise and tags) for matched IDs
+    // Fetch full contact data for matched IDs
     const matchedIds = data.map((d: Record<string, unknown>) => d.id);
     const { data: fullContacts } = await supabase
       .from("contacts")
       .select(
-        "id, volledige_naam, organisatie, functie, sector, expertise, tags, bio, functieniveau, suriname_score"
+        "id, volledige_naam, organisatie, functie, sector, expertise, tags, bio, functieniveau, suriname_score, email_1, email_2, telefoon_1, telefoon_2, linkedin_url, stad, land, bron"
       )
       .in("id", matchedIds);
 
-    // Create a lookup map for full contact data
+    // Create lookup maps
     const contactMap = new Map<number, Record<string, unknown>>();
     if (fullContacts) {
       for (const c of fullContacts) {
@@ -73,62 +128,81 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Build a similarity lookup from the RPC results
     const similarityMap = new Map<number, number>();
     for (const d of data) {
       similarityMap.set(
         d.id as number,
-        typeof d.similarity === "number" ? d.similarity : parseFloat(String(d.similarity)) || 0
+        typeof d.similarity === "number"
+          ? d.similarity
+          : parseFloat(String(d.similarity)) || 0
       );
     }
 
-    // Transform results, using full contact data merged with similarity scores
+    // Transform results with full contact details
     const results = matchedIds.map((id: number) => {
-      const full = contactMap.get(id) || {};
-      const rpcRow = data.find((d: Record<string, unknown>) => d.id === id) || {};
+      const full = (contactMap.get(id) || {}) as Record<string, unknown>;
+      const rpcRow = (data.find((d: Record<string, unknown>) => d.id === id) ||
+        {}) as Record<string, unknown>;
       const similarity = similarityMap.get(id) || 0;
 
-      // Use full contact data, fall back to RPC data
-      const name = (full as Record<string, unknown>).volledige_naam || (rpcRow as Record<string, unknown>).volledige_naam || "Onbekend";
-      const org = (full as Record<string, unknown>).organisatie || (rpcRow as Record<string, unknown>).organisatie || "";
-      const title = (full as Record<string, unknown>).functie || (rpcRow as Record<string, unknown>).functie || "";
-      const sector = (full as Record<string, unknown>).sector || (rpcRow as Record<string, unknown>).sector || "";
-      const bio = (full as Record<string, unknown>).bio || (rpcRow as Record<string, unknown>).bio || "";
-      const expertise = (full as Record<string, unknown>).expertise || "";
-      const tags = (full as Record<string, unknown>).tags || "";
-      const functieniveau = (full as Record<string, unknown>).functieniveau || "";
+      const name = String(
+        full.volledige_naam || rpcRow.volledige_naam || "Onbekend"
+      );
+      const org = String(full.organisatie || rpcRow.organisatie || "");
+      const title = String(full.functie || rpcRow.functie || "");
+      const sector = String(full.sector || rpcRow.sector || "");
+      const bio = String(full.bio || rpcRow.bio || "");
+      const expertise = String(full.expertise || "");
+      const functieniveau = String(full.functieniveau || "");
+      const surinameScore =
+        full.suriname_score !== null && full.suriname_score !== undefined
+          ? Number(full.suriname_score)
+          : null;
+      const tags = String(full.tags || "");
 
-      // Build labels from expertise, tags, sector, and functieniveau
+      // Contact details
+      const email = full.email_1 ? String(full.email_1) : null;
+      const phone = full.telefoon_1 ? String(full.telefoon_1) : null;
+      const linkedinUrl = full.linkedin_url
+        ? String(full.linkedin_url)
+        : null;
+      const location = buildLocation(
+        full.stad ? String(full.stad) : null,
+        full.land ? String(full.land) : null
+      );
+      const source = full.bron ? String(full.bron) : null;
+
+      // Build labels
       const labels: string[] = [];
-
-      // Add sector as first label
-      if (sector && sector !== "Other") {
-        labels.push(sector as string);
-      }
-
-      // Add expertise
-      if (expertise) {
-        const expertiseStr = String(expertise);
-        if (expertiseStr && expertiseStr !== "Other") {
-          // Split if comma-separated
-          const parts = expertiseStr.split(",").map((t: string) => t.trim()).filter(Boolean);
-          for (const part of parts) {
-            if (!labels.includes(part)) labels.push(part);
+      if (sector && sector !== "Other" && sector !== "null") {
+        // Split multi-sector (e.g. "Education/Research, Technology")
+        const sectorParts = sector.split(",").map((s: string) => s.trim());
+        for (const sp of sectorParts) {
+          if (sp && sp !== "Other" && !labels.includes(sp)) {
+            labels.push(sp);
           }
         }
       }
-
-      // Add functieniveau
-      if (functieniveau && functieniveau !== "Other") {
-        if (!labels.includes(functieniveau as string)) {
-          labels.push(functieniveau as string);
+      if (expertise && expertise !== "Other" && expertise !== "null") {
+        const expParts = expertise.split(",").map((t: string) => t.trim());
+        for (const part of expParts) {
+          if (part && part !== "Other" && !labels.includes(part)) {
+            labels.push(part);
+          }
         }
       }
-
-      // Parse country from tags (format: "country:belgium,region:europe,sector:finance")
-      if (tags) {
-        const tagStr = String(tags);
-        const tagParts = tagStr.split(",").map((t: string) => t.trim());
+      if (
+        functieniveau &&
+        functieniveau !== "Other" &&
+        functieniveau !== "null"
+      ) {
+        if (!labels.includes(functieniveau)) {
+          labels.push(functieniveau);
+        }
+      }
+      // Parse country from tags
+      if (tags && tags !== "null") {
+        const tagParts = tags.split(",").map((t: string) => t.trim());
         for (const tag of tagParts) {
           if (tag.startsWith("country:")) {
             const country = tag.replace("country:", "").trim();
@@ -138,31 +212,40 @@ export async function POST(request: NextRequest) {
           }
         }
       }
-
-      // Build motivation sentence from bio or constructed
-      let motivation: string;
-      if (bio && String(bio).length > 10) {
-        motivation = String(bio);
-      } else {
-        const parts: string[] = [];
-        if (title) parts.push(`de functie ${title}`);
-        if (org) parts.push(`werkzaam bij ${org}`);
-        if (sector) parts.push(`actief in de ${sector}-sector`);
-        motivation =
-          parts.length > 0
-            ? `${name} is relevant: ${parts.join(", ")}.`
-            : `${name} komt overeen met uw zoekcriteria.`;
+      // Suriname relevance badge
+      if (surinameScore !== null && surinameScore >= 0.6) {
+        if (!labels.includes("Suriname")) {
+          labels.unshift("Suriname");
+        }
       }
+
+      // Build motivation
+      const motivation = buildMotivation(
+        name,
+        title,
+        org,
+        sector,
+        expertise,
+        bio,
+        surinameScore
+      );
 
       return {
         id,
-        full_name: name as string,
-        organization: (org as string) || null,
-        job_title: (title as string) || null,
-        sector: (sector as string) || null,
+        full_name: name,
+        organization: org || null,
+        job_title: title || null,
+        sector: sector || null,
         match_score: Math.round(similarity * 100) / 100,
-        labels: labels.slice(0, 5),
+        labels: labels.slice(0, 6),
         motivation,
+        email,
+        phone,
+        linkedin_url: linkedinUrl,
+        location,
+        function_level: functieniveau || null,
+        suriname_score: surinameScore,
+        source,
       };
     });
 
@@ -171,7 +254,7 @@ export async function POST(request: NextRequest) {
     if (filters?.sector) {
       filtered = filtered.filter(
         (r: { sector: string | null }) =>
-          r.sector?.toLowerCase() === filters.sector.toLowerCase()
+          r.sector?.toLowerCase().includes(filters.sector.toLowerCase())
       );
     }
 
