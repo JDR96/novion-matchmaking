@@ -159,9 +159,23 @@ export default function ContactDetailModal({
                     .slice(0, 2)}
                 </div>
                 <div className="min-w-0 flex-1">
-                  <h2 className="text-lg font-bold text-foreground">
-                    {contact.full_name}
-                  </h2>
+                  <div className="flex items-center gap-2">
+                    <h2 className="text-lg font-bold text-foreground">
+                      {contact.full_name}
+                    </h2>
+                    {contact.notes?.includes("[naam-opgeschoond]") && (
+                      <span
+                        className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-amber-50 text-amber-500 dark:bg-amber-900/20 dark:text-amber-400"
+                        title={`Naam automatisch opgeschoond. ${contact.notes.replace("[naam-opgeschoond] ", "")}`}
+                      >
+                        <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round">
+                          <circle cx="12" cy="12" r="10" />
+                          <path d="M9.09 9a3 3 0 0 1 5.83 1c0 2-3 3-3 3" />
+                          <line x1="12" y1="17" x2="12.01" y2="17" />
+                        </svg>
+                      </span>
+                    )}
+                  </div>
                   {contact.job_title && (
                     <p className="text-sm text-muted-foreground">
                       {contact.job_title}
