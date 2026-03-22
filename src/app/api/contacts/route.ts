@@ -11,11 +11,14 @@ export async function GET(request: NextRequest) {
   try {
     const { searchParams } = new URL(request.url);
     const page = Math.max(1, parseInt(searchParams.get("page") || "1"));
-    const limit = Math.min(100, Math.max(10, parseInt(searchParams.get("limit") || "50")));
+    const limit = Math.min(
+      100,
+      Math.max(10, parseInt(searchParams.get("limit") || "50"))
+    );
     const search = searchParams.get("search") || "";
     const sector = searchParams.get("sector") || "";
     const sort = searchParams.get("sort") || "volledige_naam";
-    const order = searchParams.get("order") === "desc" ? false : true; // ascending by default
+    const order = searchParams.get("order") === "desc" ? false : true;
 
     const offset = (page - 1) * limit;
 
@@ -27,11 +30,19 @@ export async function GET(request: NextRequest) {
         { count: "exact" }
       );
 
-    // Text search filter
+    // Text search: split into words, each word must match at least one field
+    // This way "Kees van Eijk" finds "(Kees) C. P. F. van Eijk"
     if (search) {
-      query = query.or(
-        `volledige_naam.ilike.%${search}%,organisatie.ilike.%${search}%,functie.ilike.%${search}%,sector.ilike.%${search}%,expertise.ilike.%${search}%`
-      );
+      const words = search
+        .trim()
+        .split(/\s+/)
+        .filter((w) => w.length > 0);
+
+      for (const word of words) {
+        query = query.or(
+          `volledige_naam.ilike.%${word}%,organisatie.ilike.%${word}%,functie.ilike.%${word}%,sector.ilike.%${word}%,expertise.ilike.%${word}%`
+        );
+      }
     }
 
     // Sector filter
@@ -48,7 +59,9 @@ export async function GET(request: NextRequest) {
       "suriname_score",
       "kwaliteitsscore",
     ];
-    const sortField = validSortFields.includes(sort) ? sort : "volledige_naam";
+    const sortField = validSortFields.includes(sort)
+      ? sort
+      : "volledige_naam";
     query = query.order(sortField, { ascending: order, nullsFirst: false });
 
     // Pagination
@@ -75,8 +88,7 @@ export async function GET(request: NextRequest) {
       email: c.email_1 || null,
       phone: c.telefoon_1 || null,
       linkedin_url: c.linkedin_url || null,
-      location:
-        [c.stad, c.land].filter(Boolean).join(", ") || null,
+      location: [c.stad, c.land].filter(Boolean).join(", ") || null,
       function_level: c.functieniveau || null,
       suriname_score: c.suriname_score ?? null,
       source: c.bron || null,
