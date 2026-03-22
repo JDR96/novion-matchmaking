@@ -168,9 +168,55 @@ export default function ContactDetailModal({
                     </p>
                   )}
                   {contact.organization && (
-                    <p className="text-sm font-medium text-foreground/70">
-                      {contact.organization}
-                    </p>
+                    <div className="mt-1 flex items-center gap-1.5">
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0 text-muted-foreground"
+                      >
+                        <rect width="16" height="20" x="4" y="2" rx="2" ry="2" />
+                        <path d="M9 22v-4h6v4" />
+                        <path d="M8 6h.01" />
+                        <path d="M16 6h.01" />
+                        <path d="M12 6h.01" />
+                        <path d="M12 10h.01" />
+                        <path d="M12 14h.01" />
+                        <path d="M16 10h.01" />
+                        <path d="M16 14h.01" />
+                        <path d="M8 10h.01" />
+                        <path d="M8 14h.01" />
+                      </svg>
+                      <p className="text-sm font-medium text-foreground/80">
+                        {contact.organization}
+                      </p>
+                    </div>
+                  )}
+                  {contact.city && (
+                    <div className="mt-0.5 flex items-center gap-1.5">
+                      <svg
+                        width="13"
+                        height="13"
+                        viewBox="0 0 24 24"
+                        fill="none"
+                        stroke="currentColor"
+                        strokeWidth="2"
+                        strokeLinecap="round"
+                        strokeLinejoin="round"
+                        className="shrink-0 text-muted-foreground"
+                      >
+                        <path d="M21 10c0 7-9 13-9 13s-9-6-9-13a9 9 0 0 1 18 0z" />
+                        <circle cx="12" cy="10" r="3" />
+                      </svg>
+                      <p className="text-xs text-muted-foreground">
+                        {[contact.city, contact.country].filter(Boolean).join(", ")}
+                      </p>
+                    </div>
                   )}
                   <div className="mt-2 flex flex-wrap gap-1.5">
                     {hasSuriname && (
@@ -273,7 +319,7 @@ export default function ContactDetailModal({
                       {contact.linkedin_searched && (
                         <span
                           className="ml-2 inline-flex items-center gap-1 rounded-md bg-amber-50 px-1.5 py-0.5 text-[10px] font-medium text-amber-600 dark:bg-amber-900/20 dark:text-amber-400"
-                          title="Dit LinkedIn profiel is automatisch gezocht op basis van de naam en kan onjuist zijn."
+                          title="Automatisch gezocht. Dit profiel is niet geverifieerd en kan onjuist zijn."
                         >
                           <svg
                             width="10"
@@ -289,7 +335,7 @@ export default function ContactDetailModal({
                             <line x1="12" y1="8" x2="12" y2="12" />
                             <line x1="12" y1="16" x2="12.01" y2="16" />
                           </svg>
-                          Gezocht
+                          Niet geverifieerd
                         </span>
                       )}
                     </div>

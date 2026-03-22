@@ -8,37 +8,151 @@ const supabaseKey =
 const supabase = createClient(supabaseUrl, supabaseKey);
 
 /**
- * Attempt to find a LinkedIn profile URL by searching Google.
- * Returns { url, searched: true } if found via search, or { url: null, searched: true } if not found.
+ * Extract a clean first name and last name from a full name string.
+ * Strips parenthetical content, initials, prefixes, and suffixes.
+ * Examples:
+ *   "(Kees) C. P. F. van Eijk" → { first: "Kees", last: "van Eijk" }
+ *   "drs. J.C. (Jan Kees) van Vliet" → { first: "Jan Kees", last: "van Vliet" }
+ *   "Jelle Tas" → { first: "Jelle", last: "Tas" }
+ */
+function extractCleanName(fullName: string): {
+  first: string;
+  last: string;
+} {
+  let name = fullName.trim();
+
+  // Extract name from parentheses if present (often the actual call name)
+  const parenMatch = name.match(/\(([^)]+)\)/);
+  let callName = parenMatch ? parenMatch[1].trim() : "";
+
+  // Remove all parenthetical content from the main name
+  name = name.replace(/\([^)]*\)/g, "").trim();
+
+  // Remove common prefixes
+  name = name
+    .replace(/^(prof\.|dr\.|drs\.|ir\.|mr\.|ing\.|bc\.|msc\.?|bsc\.?)\s*/gi, "")
+    .trim();
+
+  // Split into parts
+  const parts = name.split(/\s+/).filter((p) => p.length > 0);
+
+  // Remove parts that are just initials (single letters or letters with dots)
+  const realParts = parts.filter(
+    (p) => !p.match(/^[A-Z]\.?$/i) && !p.match(/^[A-Z]\.[A-Z]\.?$/i)
+  );
+
+  // Dutch name prefixes that belong to the last name
+  const prefixes = new Set([
+    "van",
+    "de",
+    "den",
+    "der",
+    "het",
+    "ter",
+    "ten",
+    "te",
+    "op",
+    "in",
+    "'t",
+  ]);
+
+  let firstName = "";
+  let lastName = "";
+
+  if (realParts.length >= 2) {
+    // Find where the last name starts (first prefix or last word)
+    let lastNameStart = realParts.length - 1;
+    for (let i = 1; i < realParts.length; i++) {
+      if (prefixes.has(realParts[i].toLowerCase())) {
+        lastNameStart = i;
+        break;
+      }
+    }
+    firstName = realParts.slice(0, lastNameStart).join(" ");
+    lastName = realParts.slice(lastNameStart).join(" ");
+  } else if (realParts.length === 1) {
+    firstName = realParts[0];
+    lastName = "";
+  }
+
+  // If we found a call name in parentheses, use it as first name
+  if (callName) {
+    // If callName has multiple words, use them all as first name
+    firstName = callName;
+  }
+
+  return { first: firstName, last: lastName };
+}
+
+/**
+ * Search for a LinkedIn profile using Google search.
  */
 async function searchLinkedIn(
-  name: string,
+  fullName: string,
   organization: string | null
 ): Promise<{ url: string | null; searched: boolean }> {
   try {
-    const searchQuery = organization
-      ? `${name} ${organization} site:linkedin.com/in`
-      : `${name} site:linkedin.com/in`;
+    const { first, last } = extractCleanName(fullName);
 
-    // Use Google Custom Search API or a simple fetch approach
-    // For now, construct a likely LinkedIn URL from the name
-    const slug = name
-      .toLowerCase()
-      .replace(/[^a-z0-9\s-]/g, "")
-      .trim()
-      .replace(/\s+/g, "-");
-
-    if (!slug || slug.length < 2) {
+    if (!first && !last) {
       return { url: null, searched: true };
     }
 
-    // Try to verify the LinkedIn URL exists
-    const linkedinUrl = `https://www.linkedin.com/in/${slug}`;
+    const namePart = [first, last].filter(Boolean).join(" ");
 
-    // We can't verify in server-side easily, so return the constructed URL
-    // marked as "searched" (not from the original database)
-    return { url: linkedinUrl, searched: true };
+    // Build Google search query
+    const searchTerms = organization
+      ? `${namePart} ${organization} linkedin`
+      : `${namePart} linkedin`;
+
+    const googleUrl = `https://www.google.com/search?q=${encodeURIComponent(searchTerms)}&num=5`;
+
+    const response = await fetch(googleUrl, {
+      headers: {
+        "User-Agent":
+          "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36",
+        Accept: "text/html",
+        "Accept-Language": "en-US,en;q=0.9",
+      },
+      signal: AbortSignal.timeout(5000),
+    });
+
+    if (!response.ok) {
+      // Fallback: construct a LinkedIn search URL
+      return {
+        url: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(namePart)}`,
+        searched: true,
+      };
+    }
+
+    const html = await response.text();
+
+    // Extract LinkedIn profile URLs from Google results
+    const linkedinPattern =
+      /https?:\/\/(?:www\.)?linkedin\.com\/in\/[a-zA-Z0-9_-]+/g;
+    const matches = html.match(linkedinPattern);
+
+    if (matches && matches.length > 0) {
+      // Deduplicate and return the first unique one
+      const uniqueUrls = [...new Set(matches)];
+      return { url: uniqueUrls[0], searched: true };
+    }
+
+    // No profile found, return a LinkedIn search link instead
+    return {
+      url: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(namePart)}`,
+      searched: true,
+    };
   } catch {
+    // On timeout or error, return a search link
+    const { first, last } = extractCleanName(fullName);
+    const namePart = [first, last].filter(Boolean).join(" ");
+    if (namePart) {
+      return {
+        url: `https://www.linkedin.com/search/results/people/?keywords=${encodeURIComponent(namePart)}`,
+        searched: true,
+      };
+    }
     return { url: null, searched: true };
   }
 }
@@ -73,14 +187,14 @@ export async function GET(
 
     const c = data as Record<string, unknown>;
 
-    // If no LinkedIn URL exists, try to find one
+    // If no LinkedIn URL exists, try to find one via Google
     let linkedinUrl = c.linkedin_url ? String(c.linkedin_url) : null;
     let linkedinSearched = false;
 
     if (!linkedinUrl) {
       const name = String(c.volledige_naam || "");
       const org = c.organisatie ? String(c.organisatie) : null;
-      if (name && name !== "Onbekend") {
+      if (name && name !== "Onbekend" && name.length > 2) {
         const result = await searchLinkedIn(name, org);
         linkedinUrl = result.url;
         linkedinSearched = result.searched;
